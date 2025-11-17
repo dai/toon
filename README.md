@@ -8,11 +8,13 @@
 [![npm downloads (total)](https://img.shields.io/npm/dt/@toon-format/toon.svg)](https://www.npmjs.com/package/@toon-format/toon)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-**Token-Oriented Object Notation** is a compact, human-readable serialization format designed for passing structured data to Large Language Models with significantly reduced token usage. It's intended for *LLM input* as a lossless, drop-in representation of JSON data.
+**Token-Oriented Object Notation** is a compact, human-readable encoding of the JSON data model for LLM prompts. It provides a lossless serialization of the same objects, arrays, and primitives as JSON, but in a syntax that minimizes tokens and makes structure easy for models to follow.
 
-TOON's sweet spot is **uniform arrays of objects** – multiple fields per row, same structure across items. It borrows YAML's indentation-based structure for nested objects and CSV's tabular format for uniform data rows, then optimizes both for token efficiency in LLM contexts. For deeply nested or non-uniform data, JSON may be more efficient.
+TOON combines YAML's indentation-based structure for nested objects with a CSV-style tabular layout for uniform arrays. TOON's sweet spot is uniform arrays of objects (multiple fields per row, same structure across items), achieving CSV-like compactness while adding explicit structure that helps LLMs parse and validate data reliably. For deeply nested or non-uniform data, JSON may be more efficient.
 
-TOON achieves CSV-like compactness while adding explicit structure that helps LLMs parse and validate data reliably. Think of it as a translation layer: use JSON programmatically, convert to TOON for LLM input.
+The similarity to CSV is intentional: CSV is simple and ubiquitous, and TOON aims to keep that familiarity while remaining a lossless, drop-in representation of JSON for Large Language Models.
+
+Think of it as a translation layer: use JSON programmatically, and encode it as TOON for LLM input.
 
 > [!TIP]
 > TOON is production-ready, but also an idea in progress. Nothing's set in stone – help shape where it goes by contributing to the [spec](https://github.com/toon-format/spec) or sharing feedback.
@@ -23,15 +25,15 @@ TOON achieves CSV-like compactness while adding explicit structure that helps LL
 - [Key Features](#key-features)
 - [When Not to Use TOON](#when-not-to-use-toon)
 - [Benchmarks](#benchmarks)
-- [📋 Full Specification](https://github.com/toon-format/spec/blob/main/SPEC.md)
 - [Installation & Quick Start](#installation--quick-start)
+- [Playgrounds](#playgrounds)
 - [CLI](#cli)
 - [Format Overview](#format-overview)
 - [API](#api)
 - [Using TOON in LLM Prompts](#using-toon-in-llm-prompts)
-- [Notes and Limitations](#notes-and-limitations)
 - [Syntax Cheatsheet](#syntax-cheatsheet)
 - [Other Implementations](#other-implementations)
+- [📋 Full Specification](https://github.com/toon-format/spec/blob/main/SPEC.md)
 
 ## Why TOON?
 
@@ -39,19 +41,92 @@ AI is becoming cheaper and more accessible, but larger context windows allow for
 
 ```json
 {
-  "users": [
-    { "id": 1, "name": "Alice", "role": "admin" },
-    { "id": 2, "name": "Bob", "role": "user" }
+  "context": {
+    "task": "Our favorite hikes together",
+    "location": "Boulder",
+    "season": "spring_2025"
+  },
+  "friends": ["ana", "luis", "sam"],
+  "hikes": [
+    {
+      "id": 1,
+      "name": "Blue Lake Trail",
+      "distanceKm": 7.5,
+      "elevationGain": 320,
+      "companion": "ana",
+      "wasSunny": true
+    },
+    {
+      "id": 2,
+      "name": "Ridge Overlook",
+      "distanceKm": 9.2,
+      "elevationGain": 540,
+      "companion": "luis",
+      "wasSunny": false
+    },
+    {
+      "id": 3,
+      "name": "Wildflower Loop",
+      "distanceKm": 5.1,
+      "elevationGain": 180,
+      "companion": "sam",
+      "wasSunny": true
+    }
   ]
 }
 ```
 
-TOON conveys the same information with **fewer tokens**:
+<details>
+<summary>YAML already conveys the same information with <strong>fewer tokens</strong>.</summary>
 
+```yaml
+context:
+  task: Our favorite hikes together
+  location: Boulder
+  season: spring_2025
+
+friends:
+  - ana
+  - luis
+  - sam
+
+hikes:
+  - id: 1
+    name: Blue Lake Trail
+    distanceKm: 7.5
+    elevationGain: 320
+    companion: ana
+    wasSunny: true
+  - id: 2
+    name: Ridge Overlook
+    distanceKm: 9.2
+    elevationGain: 540
+    companion: luis
+    wasSunny: false
+  - id: 3
+    name: Wildflower Loop
+    distanceKm: 5.1
+    elevationGain: 180
+    companion: sam
+    wasSunny: true
 ```
-users[2]{id,name,role}:
-  1,Alice,admin
-  2,Bob,user
+
+</details>
+
+TOON conveys the same information with **even fewer tokens** – combining YAML-like indentation with CSV-style tabular arrays:
+
+```toon
+context:
+  task: Our favorite hikes together
+  location: Boulder
+  season: spring_2025
+
+friends[3]: ana,luis,sam
+
+hikes[3]{id,name,distanceKm,elevationGain,companion,wasSunny}:
+  1,Blue Lake Trail,7.5,320,ana,true
+  2,Ridge Overlook,9.2,540,luis,false
+  3,Wildflower Loop,5.1,180,sam,true
 ```
 
 ## Key Features
@@ -77,9 +152,6 @@ TOON excels with uniform arrays of objects, but there are cases where other form
 See [benchmarks](#benchmarks) for concrete comparisons across different data structures.
 
 ## Benchmarks
-
-> [!TIP]
-> Try the interactive [Format Tokenization Playground](https://www.curiouslychase.com/playground/format-tokenization-exploration) to compare token usage across CSV, JSON, YAML, and TOON with your own data.
 
 Benchmarks are organized into two tracks to ensure fair comparisons:
 
@@ -653,6 +725,22 @@ repositories[3]{id,name,repo,description,createdAt,updatedAt,pushedAt,stars,watc
 
 ## Installation & Quick Start
 
+### CLI (No Installation Required)
+
+Try TOON instantly with npx:
+
+```bash
+# Convert JSON to TOON
+npx @toon-format/cli input.json -o output.toon
+
+# Pipe from stdin
+echo '{"name": "Ada", "role": "dev"}' | npx @toon-format/cli
+```
+
+See [CLI section](#cli) for all options and examples.
+
+### TypeScript Library
+
 ```bash
 # npm
 npm install @toon-format/toon
@@ -681,6 +769,13 @@ console.log(encode(data))
 //   1,Alice,admin
 //   2,Bob,user
 ```
+
+## Playgrounds
+
+Experiment with TOON format interactively using these community-built tools for token comparison, format conversion, and validation:
+
+- **[Format Tokenization Playground](https://www.curiouslychase.com/playground/format-tokenization-exploration)**
+- **[TOON Tools](https://toontools.vercel.app/)**
 
 ## CLI
 
@@ -1133,15 +1228,6 @@ By default, the decoder validates input strictly:
 - **Array length mismatches**: Throws when declared length doesn't match actual count.
 - **Delimiter mismatches**: Throws when row delimiters don't match header.
 
-## Notes and Limitations
-
-- Format familiarity and structure matter as much as token count. TOON's tabular format requires arrays of objects with identical keys and primitive values only. When this doesn't hold (due to mixed types, non-uniform objects, or nested structures), TOON switches to list format where JSON can be more efficient at scale.
-  - **TOON excels at:** Uniform arrays of objects (same fields, primitive values), especially large datasets with consistent structure.
-  - **JSON is better for:** Non-uniform data, deeply nested structures, and objects with varying field sets.
-  - **CSV is more compact for:** Flat, uniform tables without nesting. TOON adds structure (`[N]` array lengths, delimiter scoping, deterministic quoting) that improves LLM reliability with minimal token overhead.
-- **Token counts vary by tokenizer and model.** Benchmarks use a GPT-style tokenizer (cl100k/o200k); actual savings will differ with other models (e.g., [SentencePiece](https://github.com/google/sentencepiece)).
-- **TOON is designed for LLM input** where human readability and token efficiency matter. It's **not** a drop-in replacement for JSON in APIs or storage.
-
 ## Using TOON in LLM Prompts
 
 TOON works best when you show the format instead of describing it. The structure is self-documenting – models parse it naturally once they see the pattern.
@@ -1230,16 +1316,20 @@ Task: Return only users with role "user" as TOON. Use the same header. Set [N] t
 
 ### Official Implementations
 
+> [!TIP]
+> These implementations are actively being developed by dedicated teams. Contributions are welcome! Join the effort by opening issues, submitting PRs, or discussing implementation details in the respective repositories.
+
+- **.NET:** [toon_format](https://github.com/toon-format/toon-dotnet) *(in development)*
+- **Dart:** [toon](https://github.com/toon-format/toon-dart) *(in development)*
+- **Go:** [gotoon](https://github.com/toon-format/toon-go) *(in development)*
 - **Python:** [toon_format](https://github.com/toon-format/toon-python) *(in development)*
 - **Rust:** [toon_format](https://github.com/toon-format/toon-rust) *(in development)*
 
 ### Community Implementations
 
-- **.NET:** [ToonSharp](https://github.com/0xZunia/ToonSharp)
 - **C++:** [ctoon](https://github.com/mohammadraziei/ctoon)
 - **Clojure:** [toon](https://github.com/vadelabs/toon)
 - **Crystal:** [toon-crystal](https://github.com/mamantoha/toon-crystal)
-- **Dart:** [toon](https://github.com/wisamidris77/toon)
 - **Elixir:** [toon_ex](https://github.com/kentaro/toon_ex)
 - **Gleam:** [toon_codec](https://github.com/axelbellec/toon_codec)
 - **Go:** [gotoon](https://github.com/alpkeskin/gotoon)
